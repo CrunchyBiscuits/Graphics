@@ -66,7 +66,7 @@ namespace rst
         void set_view(const Eigen::Matrix4f& v);
         void set_projection(const Eigen::Matrix4f& p);
 
-        void set_pixel(const Eigen::Vector3f& point, const Eigen::Vector3f& color);
+        void set_pixel(const Eigen::Vector3f& point, const Eigen::Vector3f& color,float percent);
 
         void clear(Buffers buff);
 

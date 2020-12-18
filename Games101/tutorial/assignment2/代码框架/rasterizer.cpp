@@ -39,7 +39,6 @@ auto to_vec4(const Eigen::Vector3f& v3, float w = 1.0f)
     return Vector4f(v3.x(), v3.y(), v3.z(), w);
 }
 
-
 static bool insideTriangle(int x, int y, const Vector3f* _v)
 {   
     // TODO : Implement this function to check if the point (x, y) is inside the triangle represented by _v[0], _v[1], _v[2]
@@ -60,6 +59,24 @@ static bool insideTriangle(int x, int y, const Vector3f* _v)
     return ((_v[0]-_v[1]).cross(P-_v[1]).z()<0&&
             (_v[2]-_v[0]).cross(P-_v[0]).z()<0&&
             (_v[1]-_v[2]).cross(P-_v[2]).z()<0);
+}
+
+static float insideTrianglePercent(int x, int y, const Vector3f* _v, int density){
+    float percent = 0;
+    float step = sqrt(density);
+    float fragment_spacing = 1.0/step;
+    float margin = fragment_spacing/2;
+    float weight = 1.0/density;
+
+    for(int i=0;i<step; i++){
+        for (int j = 0; j < step; j++)
+        {
+            percent += insideTriangle(x+margin+fragment_spacing*i,
+                        y+margin+fragment_spacing*j,_v)*weight;
+        }
+        
+    }
+    return percent;
 }
 
 static std::tuple<float, float, float> computeBarycentric2D(float x, float y, const Vector3f* v)
@@ -142,18 +159,18 @@ void rst::rasterizer::rasterize_triangle(const Triangle& t) {
     for(int x = left_bound;x<=right_bound;x++){
         for (int y = bottom_bound; y <= up_bound; y++)
         {
-            
-
-            auto[alpha, beta, gamma] = computeBarycentric2D(x, y, t.v);
-            float w_reciprocal = 1.0/(alpha / v[0].w() + beta / v[1].w() + gamma / v[2].w());
-            float z_interpolated = alpha * v[0].z() / v[0].w() + beta * v[1].z() / v[1].w() + gamma * v[2].z() / v[2].w();
-            z_interpolated *= w_reciprocal;
-            if(insideTriangle(x,y,t.v)){
+            float percent = insideTrianglePercent(x,y,t.v,4);
+            if (percent>0)
+            {
+                auto[alpha, beta, gamma] = computeBarycentric2D(x, y, t.v);
+                float w_reciprocal = 1.0/(alpha / v[0].w() + beta / v[1].w() + gamma / v[2].w());
+                float z_interpolated = alpha * v[0].z() / v[0].w() + beta * v[1].z() / v[1].w() + gamma * v[2].z() / v[2].w();
+                z_interpolated *= w_reciprocal;
 
                 p.x() = x;
                 p.y() = y;
                 if(z_interpolated < depth_buf[get_index(x,y)]){
-                    set_pixel(p,t.getColor());
+                    set_pixel(p,t.getColor(),percent);
                     depth_buf[get_index(x,y)] = z_interpolated;
                 }
             }
@@ -199,12 +216,13 @@ int rst::rasterizer::get_index(int x, int y)
     return (height-1-y)*width + x;
 }
 
-void rst::rasterizer::set_pixel(const Eigen::Vector3f& point, const Eigen::Vector3f& color)
+void rst::rasterizer::set_pixel(const Eigen::Vector3f& point, const Eigen::Vector3f& color, float percent)
 {
     //old index: auto ind = point.y() + point.x() * width;
     auto ind = (height-1-point.y())*width + point.x();
-    frame_buf[ind] = color;
+    frame_buf[ind] = color*percent;
 
 }
+
 
 // clang-format on
